@@ -299,34 +299,28 @@ public class SafetyPlaceService {
     // Ativa um local seguro, se houver compatibilidade, e atualiza o usuário com a nova lista de locais seguros
     public boolean acceptActive(LocationDTO locationDTO, String locationId, String cnpj, String clientId) throws Exception {
         Optional<SafetyPlace> safetyPlaceOpt = safetyPlaceRepository.findById(locationId);
-        User user = userService.findById(cnpj, clientId);
-
         if (safetyPlaceOpt.isEmpty()) {
             throw new RuntimeException("Local seguro não encontrado com o id " + locationId);
         }
-
         SafetyPlace safetyPlace = safetyPlaceOpt.get();
+
+        User user = userService.findById(cnpj, clientId);
 
         boolean canActivate = hasActiveCompatibleSafetyPlace(locationDTO, user);
 
         safetyPlace.setActive(canActivate);
+        safetyPlaceRepository.save(safetyPlace);
 
-        if (canActivate) {
-            safetyPlaceRepository.save(safetyPlace);
-
-            List<SafetyPlace> safetyPlaces = user.getSafetyPlaces();
-            if (safetyPlaces != null) {
-                List<SafetyPlace> updatedList = new ArrayList<>();
-                for (SafetyPlace sp : safetyPlaces) {
-                    if (sp.getId().equals(locationId)) {
-                        updatedList.add(safetyPlace);
-                    } else {
-                        updatedList.add(sp);
-                    }
+        List<SafetyPlace> safetyPlaces = user.getSafetyPlaces();
+        if (safetyPlaces != null) {
+            for (int i = 0; i < safetyPlaces.size(); i++) {
+                SafetyPlace sp = safetyPlaces.get(i);
+                if (sp.getId().equals(locationId)) {
+                    sp.setActive(canActivate);
+                    break;
                 }
-                user.setSafetyPlaces(updatedList);
-                userService.save(user, cnpj);
             }
+            userService.save(user, cnpj);
         }
 
         return canActivate;
